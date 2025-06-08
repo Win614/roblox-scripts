@@ -1,106 +1,89 @@
---[[ 🧪 ระบบสแกนปุ่มพร้อม UI (เวอร์ชันทดสอบ) ]]
--- ไม่รวมระบบหลัก เช่น Auto Steal / Server Hop
--- รองรับมือถือ / มี ScrollView / เทเลพอร์ตไปหาปุ่มที่เลือก
+-- สคริปต์สแกนปุ่ม + วาร์ปบนมือถือ Roblox
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+repeat wait() until game:IsLoaded()
+local player = game:GetService("Players").LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
--- UI Setup
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "ScanButtonUI"
-
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 300, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "📦 ปุ่มทั้งหมดในหน้าจอ"
-Title.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-
-local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
-ScrollFrame.Position = UDim2.new(0, 0, 0, 40)
-ScrollFrame.Size = UDim2.new(1, 0, 1, -40)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.ScrollBarThickness = 6
-ScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ScrollFrame.ListLayout = Instance.new("UIListLayout", ScrollFrame)
-ScrollFrame.ListLayout.Padding = UDim.new(0, 5)
-
--- Helper: ตรวจหาตำแหน่งของปุ่มในโลก
-local function get3DPositionFromUI(guiObject)
-    local success, pos = pcall(function()
-        return guiObject.AbsolutePosition + guiObject.AbsoluteSize / 2
-    end)
-    if not success then return nil end
-
-    local viewportSize = workspace.CurrentCamera.ViewportSize
-    local relativePos = pos / viewportSize
-
-    local ray = workspace.CurrentCamera:ViewportPointToRay(pos.X, pos.Y)
-    local part = Instance.new("Part")
-    part.Anchored = true
-    part.CanCollide = false
-    part.Size = Vector3.new(0.1, 0.1, 0.1)
-    part.CFrame = CFrame.new(ray.Origin + ray.Direction * 5)
-    part.Transparency = 1
-    part.Parent = workspace
-
-    return part.Position
-end
-
--- ระบบเทเลพอร์ต
-local function teleportTo(position)
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    character:PivotTo(CFrame.new(position + Vector3.new(0, 3, 0)))
-end
-
--- ระบบสแกนปุ่มทั้งหมด
-local function scanUI()
-    ScrollFrame:ClearAllChildren()
-    local count = 0
-
-    for _, descendant in pairs(game:GetDescendants()) do
-        if descendant:IsA("TextButton") or descendant:IsA("ImageButton") then
-            if descendant:IsDescendantOf(game.CoreGui) or descendant:IsDescendantOf(LocalPlayer.PlayerGui) then
-                local name = descendant.Name
-                count += 1
-
-                local button = Instance.new("TextButton", ScrollFrame)
-                button.Size = UDim2.new(1, -10, 0, 30)
-                button.Text = "[" .. count .. "] " .. name
-                button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-                button.TextColor3 = Color3.new(1, 1, 1)
-                button.Font = Enum.Font.Gotham
-                button.TextSize = 14
-                button.AutoButtonColor = true
-
-                button.MouseButton1Click:Connect(function()
-                    local pos = get3DPositionFromUI(descendant)
-                    if pos then
-                        teleportTo(pos)
-                    end
-                end)
+-- จับ UI ปุ่มในหน้าจอทุกช่อง
+-- (มาแต่งโค้ดนี้ต่อได้ตามเกมของคุณ)
+local function scanButtons()
+    local btns = {}
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            if obj:IsDescendantOf(playerGui) or obj:IsDescendantOf(game.CoreGui) then
+                table.insert(btns, obj)
             end
         end
     end
+    return btns
 end
 
--- เริ่มต้น
-scanUI()
+-- เทคนิควาร์ป: แปลง UI เป็น world position แล้ววาร์ปตัวละคร
+local function teleportToUI(btn)
+    local cam = workspace.CurrentCamera
+    local screenPos = btn.AbsolutePosition + btn.AbsoluteSize/2
+    local ray = cam:ViewportPointToRay(screenPos.X, screenPos.Y)
+    local targetPos = ray.Origin + ray.Direction * 10
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = CFrame.new(targetPos) end
+end
 
--- ปุ่มรีโหลด (ถ้าคุณต้องการเพิ่ม)
--- คุณสามารถเพิ่มปุ่มเล็ก ๆ ไว้มุมเพื่อให้กดรีสแกนได้ภายหลัง
-print("[✅] ระบบสแกนปุ่มโหลดสำเร็จแล้ว!")
+-- แสดง UI สแกนปุ่ม
+local sg = Instance.new("ScreenGui", playerGui)
+sg.Name = "ScanUI"
+local fr = Instance.new("Frame", sg)
+fr.Size = UDim2.new(0, 300, 0, 400)
+fr.Position = UDim2.new(0.5, -150, 0.5, -200)
+fr.BackgroundColor3 = Color3.fromRGB(40,40,40)
+fr.Active = true; fr.Draggable = true
+
+local tf = Instance.new("TextLabel", fr)
+tf.Size = UDim2.new(1,0,0,40)
+tf.BackgroundColor3 = Color3.fromRGB(60,60,60)
+tf.Text = "สแกนปุ่มในหน้าจอ"
+tf.TextColor3 = Color3.new(1,1,1)
+tf.TextScaled = true
+
+local sf = Instance.new("ScrollingFrame", fr)
+sf.Position = UDim2.new(0,0,0,40)
+sf.Size = UDim2.new(1,0,1,-40)
+sf.CanvasSize = UDim2.new(0,0,0,0)
+sf.ScrollBarThickness = 6
+local list = Instance.new("UIListLayout", sf)
+list.Padding = UDim.new(0,5)
+
+-- สร้างรายการปุ่มให้กด
+local function populate()
+    for _, v in pairs(sf:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    local btns = scanButtons()
+    for i, btn in ipairs(btns) do
+        local item = Instance.new("Frame", sf)
+        item.Size = UDim2.new(1,-10,0,40)
+        item.Position = UDim2.new(0,5,0,(i-1)*45)
+        item.BackgroundColor3 = Color3.fromRGB(70,70,70)
+
+        local lbl = Instance.new("TextLabel", item)
+        lbl.Text = btn.Name
+        lbl.TextColor3 = Color3.new(1,1,1)
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(0.6,0,1,0)
+        lbl.Position = UDim2.new(0,10,0,0)
+        lbl.TextScaled = true
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        local wp = Instance.new("TextButton", item)
+        wp.Text = "Warp"
+        wp.Size = UDim2.new(0.3,-10,1,-10)
+        wp.Position = UDim2.new(0.7,5,0,5)
+        wp.BackgroundColor3 = Color3.fromRGB(0,120,215)
+        wp.TextColor3 = Color3.new(1,1,1)
+        wp.TextScaled = true
+
+        wp.MouseButton1Click:Connect(function()
+            teleportToUI(btn)
+        end)
+    end
+    sf.CanvasSize = UDim2.new(0,0,0,#btns*45)
+end
+
+populate()
