@@ -1,131 +1,107 @@
--- VOID HUB SCRIPT
--- ระบบจัดลำดับความสำคัญ:
--- 1. Auto Test
--- 2. Auto Boss Event
--- 3. Auto Infinite Castle
--- 4. Auto Dungeon
--- 5. Auto Farm Boss
+--[[ 🧪 ระบบสแกนปุ่มพร้อม UI (เวอร์ชันทดสอบ) ]]
+-- ไม่รวมระบบหลัก เช่น Auto Steal / Server Hop
+-- รองรับมือถือ / มี ScrollView / เทเลพอร์ตไปหาปุ่มที่เลือก
 
-local VoidHub = {}
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
--- 🌟 UI SETTINGS
-VoidHub.UI = {
-    Categories = {
-        ["Auto Combat"] = {
-            -- รวม Auto Test, Auto Infinite Castle, Auto Dungeon
-            AutoTest = {
-                Enabled = false,
-                Delay = 5,
-                ToggleButton = true,
-            },
-            AutoInfiniteCastle = {
-                Enabled = false,
-                ToggleButton = true,
-            },
-            AutoDungeon = {
-                Enabled = false,
-                AutoLeaveAfterBoss = true,
-                LeaveDelay = 5,
-                ToggleButton = true,
-                AutoRuneEquip = {
-                    Enabled = false,
-                    SelectedRune = nil,
-                    AvailableRunes = {},
-                    AddRuneButton = true,
-                },
-            },
-        },
+-- UI Setup
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "ScanButtonUI"
 
-        ["Auto Boss Farm"] = {
-            AutoBossFarm = {
-                Enabled = false,
-                ToggleButton = true,
-            },
-            MovementSetting = {
-                Mode = "Fly", -- หรือ "Teleport"
-                Speed = 1000, -- max 10000
-                TeleportDelay = 1.0, -- min 0.1 max 5.0
-                ValidateSpeed = function(mode, value)
-                    if mode == "Fly" then
-                        return math.min(value, 10000)
-                    else
-                        return math.clamp(value, 0.1, 5.0)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "📦 ปุ่มทั้งหมดในหน้าจอ"
+Title.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 40)
+ScrollFrame.Size = UDim2.new(1, 0, 1, -40)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollFrame.ListLayout = Instance.new("UIListLayout", ScrollFrame)
+ScrollFrame.ListLayout.Padding = UDim.new(0, 5)
+
+-- Helper: ตรวจหาตำแหน่งของปุ่มในโลก
+local function get3DPositionFromUI(guiObject)
+    local success, pos = pcall(function()
+        return guiObject.AbsolutePosition + guiObject.AbsoluteSize / 2
+    end)
+    if not success then return nil end
+
+    local viewportSize = workspace.CurrentCamera.ViewportSize
+    local relativePos = pos / viewportSize
+
+    local ray = workspace.CurrentCamera:ViewportPointToRay(pos.X, pos.Y)
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.CanCollide = false
+    part.Size = Vector3.new(0.1, 0.1, 0.1)
+    part.CFrame = CFrame.new(ray.Origin + ray.Direction * 5)
+    part.Transparency = 1
+    part.Parent = workspace
+
+    return part.Position
+end
+
+-- ระบบเทเลพอร์ต
+local function teleportTo(position)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    character:PivotTo(CFrame.new(position + Vector3.new(0, 3, 0)))
+end
+
+-- ระบบสแกนปุ่มทั้งหมด
+local function scanUI()
+    ScrollFrame:ClearAllChildren()
+    local count = 0
+
+    for _, descendant in pairs(game:GetDescendants()) do
+        if descendant:IsA("TextButton") or descendant:IsA("ImageButton") then
+            if descendant:IsDescendantOf(game.CoreGui) or descendant:IsDescendantOf(LocalPlayer.PlayerGui) then
+                local name = descendant.Name
+                count += 1
+
+                local button = Instance.new("TextButton", ScrollFrame)
+                button.Size = UDim2.new(1, -10, 0, 30)
+                button.Text = "[" .. count .. "] " .. name
+                button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+                button.TextColor3 = Color3.new(1, 1, 1)
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 14
+                button.AutoButtonColor = true
+
+                button.MouseButton1Click:Connect(function()
+                    local pos = get3DPositionFromUI(descendant)
+                    if pos then
+                        teleportTo(pos)
                     end
-                end,
-            },
-            AutoClick = {
-                Enabled = false,
-                UnlimitedSpeed = true,
-                ToggleButton = true,
-            },
-            FarmMode = {
-                Selected = "Arise", -- หรือ "Destroy"
-            },
-            BossTargetSelector = {
-                SelectedBossName = nil,
-                AvailableBosses = {}, -- auto-detected
-                MaxHP = 0,
-            },
-        },
-
-        ["Auto Boss Event"] = {
-            Enabled = false,
-            ToggleButton = true,
-            PrioritizedTimeCheck = true,
-            AutoLeaveCurrentActivity = true,
-            Modes = {
-                ["Snow Wraith"] = {
-                    Time = {"00", "30"},
-                    Weekend = {"00", "30"},
-                },
-                ["Ant Island"] = {
-                    Time = {"15"},
-                    Weekend = {"15", "45"},
-                },
-            },
-        },
-
-        ["Shop"] = {
-            AutoBuyGems = {
-                Enabled = false,
-                ToggleButton = true,
-            },
-        },
-    }
-}
-
--- 🧠 ลำดับความสำคัญของระบบ (ใช้ใน scheduler)
-VoidHub.PriorityOrder = {
-    "AutoTest",
-    "AutoBossEvent",
-    "AutoInfiniteCastle",
-    "AutoDungeon",
-    "AutoBossFarm",
-}
-
--- 🛠 ตัวอย่างฟังก์ชันลอจิกใน Scheduler
-function VoidHub:Scheduler()
-    for _, system in ipairs(self.PriorityOrder) do
-        local cat = self:GetCategoryForSystem(system)
-        local config = self.UI.Categories[cat][system]
-        if config and config.Enabled then
-            self:RunSystem(system, config)
-            break -- ทำแค่ระบบสำคัญสุดก่อน
+                end)
+            end
         end
     end
 end
 
-function VoidHub:GetCategoryForSystem(systemName)
-    for category, systems in pairs(self.UI.Categories) do
-        if systems[systemName] then
-            return category
-        end
-    end
-    return nil
-end
+-- เริ่มต้น
+scanUI()
 
-function VoidHub:RunSystem(systemName, config)
-    -- ลงรายละเอียดแต่ละระบบได้ที่นี่ เช่น RunAutoTest(config), RunDungeon(config)
-end
+-- ปุ่มรีโหลด (ถ้าคุณต้องการเพิ่ม)
+-- คุณสามารถเพิ่มปุ่มเล็ก ๆ ไว้มุมเพื่อให้กดรีสแกนได้ภายหลัง
 
-return VoidHub
+print("[✅] ระบบสแกนปุ่มโหลดสำเร็จแล้ว!")
