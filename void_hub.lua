@@ -104,6 +104,7 @@ scanUI()
 -- ปุ่มรีโหลด (ถ้าคุณต้องการเพิ่ม)
 -- คุณสามารถเพิ่มปุ่มเล็ก ๆ ไว้มุมเพื่อให้กดรีสแกนได้ภายหลัง
 print("[✅] ระบบสแกนปุ่มโหลดสำเร็จแล้ว!")
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TestUI"
 ScreenGui.ResetOnSpawn = false
