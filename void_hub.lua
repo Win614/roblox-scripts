@@ -103,5 +103,26 @@ scanUI()
 
 -- ปุ่มรีโหลด (ถ้าคุณต้องการเพิ่ม)
 -- คุณสามารถเพิ่มปุ่มเล็ก ๆ ไว้มุมเพื่อให้กดรีสแกนได้ภายหลัง
-
 print("[✅] ระบบสแกนปุ่มโหลดสำเร็จแล้ว!")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TestUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true -- ป้องกันไปซ้อน UI ด้านบน
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.new(1, 0, 0, 50)
+Label.Position = UDim2.new(0, 0, 0, 0)
+Label.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+Label.Text = "UI โหลดสำเร็จ!"
+Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+Label.Font = Enum.Font.SourceSans
+Label.TextSize = 24
+Label.Parent = MainFrame
