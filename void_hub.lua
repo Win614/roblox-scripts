@@ -1,89 +1,174 @@
--- สคริปต์สแกนปุ่ม + วาร์ปบนมือถือ Roblox
+-- VoidHub Scan Buttons Test Script for Roblox Delta (Mobile)
 
-repeat wait() until game:IsLoaded()
-local player = game:GetService("Players").LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
--- จับ UI ปุ่มในหน้าจอทุกช่อง
--- (มาแต่งโค้ดนี้ต่อได้ตามเกมของคุณ)
+-- ฟังก์ชันสแกนปุ่มทั่วแมพ (Workspace + PlayerGui)
 local function scanButtons()
-    local btns = {}
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-            if obj:IsDescendantOf(playerGui) or obj:IsDescendantOf(game.CoreGui) then
-                table.insert(btns, obj)
+    local foundButtons = {}
+
+    -- ฟังก์ชันตรวจสอบว่าตัว Object เป็นปุ่มหรือไม่ (TextButton หรือ ImageButton)
+    local function isButton(obj)
+        return obj:IsA("TextButton") or obj:IsA("ImageButton")
+    end
+
+    -- สแกนใน Workspace
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if isButton(obj) then
+            table.insert(foundButtons, obj)
+        end
+    end
+
+    -- สแกนใน PlayerGui
+    if LocalPlayer:FindFirstChild("PlayerGui") then
+        for _, obj in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+            if isButton(obj) then
+                table.insert(foundButtons, obj)
             end
         end
     end
-    return btns
+
+    return foundButtons
 end
 
--- เทคนิควาร์ป: แปลง UI เป็น world position แล้ววาร์ปตัวละคร
-local function teleportToUI(btn)
-    local cam = workspace.CurrentCamera
-    local screenPos = btn.AbsolutePosition + btn.AbsoluteSize/2
-    local ray = cam:ViewportPointToRay(screenPos.X, screenPos.Y)
-    local targetPos = ray.Origin + ray.Direction * 10
-    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.CFrame = CFrame.new(targetPos) end
+-- สร้าง UI แบบเลื่อนขึ้นลงได้
+local function createUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "ScanButtonsUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 300, 0, 400)
+    Frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = ScreenGui
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Scan Buttons List"
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.Font = Enum.Font.SourceSansBold
+    Title.TextSize = 20
+    Title.Parent = Frame
+
+    -- ScrollFrame สำหรับรายชื่อปุ่ม
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    ScrollFrame.Size = UDim2.new(1, -10, 1, -50)
+    ScrollFrame.Position = UDim2.new(0, 5, 0, 40)
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ScrollFrame.ScrollBarThickness = 8
+    ScrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ScrollFrame.BorderSizePixel = 0
+    ScrollFrame.Parent = Frame
+
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Parent = ScrollFrame
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout.Padding = UDim.new(0, 5)
+
+    return ScreenGui, ScrollFrame, UIListLayout
 end
 
--- แสดง UI สแกนปุ่ม
-local sg = Instance.new("ScreenGui", playerGui)
-sg.Name = "ScanUI"
-local fr = Instance.new("Frame", sg)
-fr.Size = UDim2.new(0, 300, 0, 400)
-fr.Position = UDim2.new(0.5, -150, 0.5, -200)
-fr.BackgroundColor3 = Color3.fromRGB(40,40,40)
-fr.Active = true; fr.Draggable = true
-
-local tf = Instance.new("TextLabel", fr)
-tf.Size = UDim2.new(1,0,0,40)
-tf.BackgroundColor3 = Color3.fromRGB(60,60,60)
-tf.Text = "สแกนปุ่มในหน้าจอ"
-tf.TextColor3 = Color3.new(1,1,1)
-tf.TextScaled = true
-
-local sf = Instance.new("ScrollingFrame", fr)
-sf.Position = UDim2.new(0,0,0,40)
-sf.Size = UDim2.new(1,0,1,-40)
-sf.CanvasSize = UDim2.new(0,0,0,0)
-sf.ScrollBarThickness = 6
-local list = Instance.new("UIListLayout", sf)
-list.Padding = UDim.new(0,5)
-
--- สร้างรายการปุ่มให้กด
-local function populate()
-    for _, v in pairs(sf:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
-    local btns = scanButtons()
-    for i, btn in ipairs(btns) do
-        local item = Instance.new("Frame", sf)
-        item.Size = UDim2.new(1,-10,0,40)
-        item.Position = UDim2.new(0,5,0,(i-1)*45)
-        item.BackgroundColor3 = Color3.fromRGB(70,70,70)
-
-        local lbl = Instance.new("TextLabel", item)
-        lbl.Text = btn.Name
-        lbl.TextColor3 = Color3.new(1,1,1)
-        lbl.BackgroundTransparency = 1
-        lbl.Size = UDim2.new(0.6,0,1,0)
-        lbl.Position = UDim2.new(0,10,0,0)
-        lbl.TextScaled = true
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-        local wp = Instance.new("TextButton", item)
-        wp.Text = "Warp"
-        wp.Size = UDim2.new(0.3,-10,1,-10)
-        wp.Position = UDim2.new(0.7,5,0,5)
-        wp.BackgroundColor3 = Color3.fromRGB(0,120,215)
-        wp.TextColor3 = Color3.new(1,1,1)
-        wp.TextScaled = true
-
-        wp.MouseButton1Click:Connect(function()
-            teleportToUI(btn)
-        end)
+-- ฟังก์ชันวาร์ปไปหาปุ่ม
+local function teleportToButton(button)
+    -- เช็คว่า button ยังอยู่ในเกมไหม
+    if not button or not button:IsDescendantOf(game) then
+        warn("ปุ่มไม่พบในเกม")
+        return
     end
-    sf.CanvasSize = UDim2.new(0,0,0,#btns*45)
+
+    -- พยายามหา Position ของปุ่มในโลกจริง
+    local pos
+
+    if button:IsA("GuiObject") then
+        -- ถ้าเป็น UI ให้ลองหาพิกัดบนหน้าจอ (ตำแหน่ง UI อาจไม่เกี่ยวกับตำแหน่ง 3D)
+        warn("ไม่สามารถวาร์ปไป UI ได้โดยตรง")
+        return
+    elseif button:IsA("BasePart") then
+        pos = button.Position
+    else
+        -- พยายามหา .Position หรือ .CFrame (ถ้ามี)
+        if button:IsA("Model") and button:FindFirstChild("PrimaryPart") then
+            pos = button.PrimaryPart.Position
+        elseif button:IsA("Instance") and button:FindFirstChild("Position") then
+            pos = button.Position
+        else
+            warn("ไม่พบตำแหน่งของปุ่ม")
+            return
+        end
+    end
+
+    if pos then
+        -- Tween ตัวละครไปตำแหน่งนั้น (ยกสูงขึ้นเล็กน้อย)
+        local humanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            local goal = {}
+            goal.CFrame = CFrame.new(pos.X, pos.Y + 3, pos.Z)
+            local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            local tween = TweenService:Create(humanoidRootPart, tweenInfo, goal)
+            tween:Play()
+        else
+            warn("ไม่พบ HumanoidRootPart")
+        end
+    end
 end
 
-populate()
+-- ฟังก์ชันสร้างปุ่มใน UI สำหรับแต่ละปุ่มที่เจอ
+local function createButtonItem(parent, button)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 16
+
+    -- ตั้งชื่อปุ่มจากชื่อ Object
+    btn.Text = button.Name or "Unnamed"
+
+    btn.Parent = parent
+
+    -- เมื่อกดปุ่ม ให้วาร์ปไปตำแหน่งปุ่มนั้น
+    btn.MouseButton1Click:Connect(function()
+        teleportToButton(button)
+    end)
+
+    return btn
+end
+
+-- เริ่มทำงาน
+local ScreenGui, ScrollFrame, UIListLayout = createUI()
+
+local function refreshButtonList()
+    -- ลบของเดิมออกก่อน
+    for _, child in pairs(ScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    local buttons = scanButtons()
+
+    for _, btn in ipairs(buttons) do
+        createButtonItem(ScrollFrame, btn)
+    end
+
+    -- อัปเดต CanvasSize ของ ScrollFrame ตามจำนวนปุ่ม
+    local listLength = #buttons
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLength * 35)
+end
+
+refreshButtonList()
+
+-- ตัวเลือกเพิ่ม: สแกนซ้ำเมื่อกดปุ่ม "R" (ในมือถืออาจเปลี่ยนเป็นปุ่ม UI)
+RunService.RenderStepped:Connect(function()
+    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.R) then
+        refreshButtonList()
+    end
+end)
+
+print("ระบบสแกนปุ่ม พร้อมใช้งานแล้ว")
